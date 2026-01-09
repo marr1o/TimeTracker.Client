@@ -1,71 +1,75 @@
 import { useState, FormEvent } from 'react';
 import {
-  Container,
   Paper,
   TextField,
   Button,
   Typography,
   Box,
   Alert,
-  Link,
 } from '@mui/material';
-import { useAuthStore } from '../stores/authStore';
-import { useNavigate } from 'react-router-dom';
+import { userService } from '../services/userService';
 
 export const Register = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
-
-  const { register, isLoading, error } = useAuthStore();
-  const navigate = useNavigate();
+  const [success, setSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLocalError(null);
+    setSuccess(false);
+    setIsLoading(true);
 
     if (!email || !password || !confirmPassword) {
       setLocalError('Пожалуйста, заполните все поля');
+      setIsLoading(false);
       return;
     }
 
     if (password !== confirmPassword) {
       setLocalError('Пароли не совпадают');
+      setIsLoading(false);
       return;
     }
 
-    if (password.length < 8) {
-      setLocalError('Пароль должен содержать минимум 8 символов');
+    if (password.length < 6) {
+      setLocalError('Пароль должен содержать минимум 6 символов');
+      setIsLoading(false);
       return;
     }
 
     try {
-      await register({ email, password });
-      navigate('/');
-    } catch (err) {
-      // Ошибка уже обработана в store
+      await userService.createUser({ email, password });
+      setSuccess(true);
+      setEmail('');
+      setPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.error || 'Ошибка при регистрации пользователя';
+      setLocalError(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
-        <Paper elevation={3} sx={{ padding: 4, width: '100%' }}>
-          <Typography component="h1" variant="h5" align="center" gutterBottom>
-            Регистрация
+    <Box>
+      <Paper elevation={2} sx={{ p: 3 }}>
+        <Typography variant="h5" gutterBottom>
+          Регистрация нового сотрудника
           </Typography>
-          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
-            {(error || localError) && (
+        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
+          {success && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              Пользователь успешно зарегистрирован
+            </Alert>
+          )}
+          {localError && (
               <Alert severity="error" sx={{ mb: 2 }}>
-                {error || localError}
+              {localError}
               </Alert>
             )}
             <TextField
@@ -93,7 +97,7 @@ export const Register = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
-              helperText="Минимум 8 символов"
+            helperText="Минимум 6 символов"
             />
             <TextField
               margin="normal"
@@ -111,26 +115,14 @@ export const Register = () => {
               type="submit"
               fullWidth
               variant="contained"
-              sx={{ mt: 3, mb: 2 }}
+            sx={{ mt: 3 }}
               disabled={isLoading}
             >
-              {isLoading ? 'Регистрация...' : 'Зарегистрироваться'}
+            {isLoading ? 'Регистрация...' : 'Зарегистрировать сотрудника'}
             </Button>
-            <Box textAlign="center">
-              <Link
-                component="button"
-                type="button"
-                variant="body2"
-                onClick={() => navigate('/login')}
-                sx={{ cursor: 'pointer' }}
-              >
-                Уже есть аккаунт? Войти
-              </Link>
-            </Box>
           </Box>
         </Paper>
       </Box>
-    </Container>
   );
 };
 

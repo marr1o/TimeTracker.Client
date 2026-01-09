@@ -7,7 +7,6 @@ import {
   Typography,
   Box,
   Alert,
-  Link,
 } from '@mui/material';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
@@ -92,17 +91,6 @@ export const Login = () => {
             >
               {isLoading ? 'Вход...' : 'Войти'}
             </Button>
-            <Box textAlign="center">
-              <Link
-                component="button"
-                type="button"
-                variant="body2"
-                onClick={() => navigate('/register')}
-                sx={{ cursor: 'pointer' }}
-              >
-                Нет аккаунта? Зарегистрироваться
-              </Link>
-            </Box>
           </Box>
         </Paper>
       </Box>

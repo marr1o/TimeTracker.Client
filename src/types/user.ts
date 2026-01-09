@@ -6,6 +6,7 @@ export type UserStatistics = {
   userId: number;
   email: string;
   totalHours: number;
+  expectedHours?: number;
 };
 
 export type UpdateUserDTO = {

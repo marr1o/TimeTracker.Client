@@ -8,5 +8,12 @@ export const statisticsService = {
     });
     return response.data;
   },
+
+  async getExpectedHours(year: number, month: number): Promise<number> {
+    const response = await api.get<{ expectedHours: number }>('/schedule/expected', {
+      params: { year, month },
+    });
+    return response.data.expectedHours;
+  },
 };
 

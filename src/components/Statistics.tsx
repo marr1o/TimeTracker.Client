@@ -17,14 +17,24 @@ import {
   CircularProgress,
   Alert,
   Collapse,
+  Button,
+  Dialog,
+  DialogContent,
 } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import NotificationsIcon from '@mui/icons-material/Notifications';
 import { statisticsService } from '../services/statisticsService';
 import { timeRecordService } from '../services/timeRecordService';
 import { formatDateToBackend } from '../utils/dateUtils';
+import { Charts } from './Charts';
+import api from '../services/api';
+import { notificationService } from '../services/notificationService';
+import { useAuthStore } from '../stores/authStore';
 import type { UserStatistics } from '../types/user';
 import type { TimeRecord } from '../types/timeRecord';
 
@@ -44,13 +54,19 @@ const MONTHS = [
 ];
 
 export const Statistics = () => {
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
   const [currentDate, setCurrentDate] = useState(new Date());
   const [statistics, setStatistics] = useState<UserStatistics[]>([]);
+  const [expectedHours, setExpectedHours] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [userDetails, setUserDetails] = useState<Map<number, TimeRecord[]>>(new Map());
   const [loadingDetails, setLoadingDetails] = useState<Set<number>>(new Set());
+  const [chartsOpen, setChartsOpen] = useState(false);
+  const [sendingNotifications, setSendingNotifications] = useState(false);
+  const [notificationSuccess, setNotificationSuccess] = useState<string | null>(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -60,14 +76,20 @@ export const Statistics = () => {
     // Очищаем развернутые строки и детали при смене месяца/года
     setExpandedRows(new Set());
     setUserDetails(new Map());
+    setNotificationSuccess(null);
+    setError(null);
   }, [year, month]);
 
   const fetchStatistics = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await statisticsService.getUserStatistics(year, month);
+      const [data, expected] = await Promise.all([
+        statisticsService.getUserStatistics(year, month),
+        statisticsService.getExpectedHours(year, month),
+      ]);
       setStatistics(data);
+      setExpectedHours(expected);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Ошибка при загрузке статистики');
     } finally {
@@ -143,12 +165,93 @@ export const Statistics = () => {
     }
   };
 
+  const handleDownloadReport = async () => {
+    try {
+      const response = await api.get('/charts/management-report', {
+        params: { year, month },
+        responseType: 'blob',
+      });
+
+      const blob = new Blob([response.data], { type: 'text/plain; charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `report_${year}_${month + 1}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err: any) {
+      console.error('Error downloading report:', err);
+      setError(err.response?.data?.error || 'Ошибка при скачивании отчета');
+    }
+  };
+
+  const handleSendNotifications = async () => {
+    setSendingNotifications(true);
+    setError(null);
+    setNotificationSuccess(null);
+    try {
+      await notificationService.checkAndCreateNotifications();
+      setNotificationSuccess('Уведомления успешно разосланы всем сотрудникам');
+      // Автоматически скрываем сообщение через 3 секунды
+      setTimeout(() => {
+        setNotificationSuccess(null);
+      }, 3000);
+    } catch (err: any) {
+      console.error('Error sending notifications:', err);
+      setError(err.response?.data?.error || 'Ошибка при рассылке уведомлений');
+    } finally {
+      setSendingNotifications(false);
+    }
+  };
+
   return (
     <Box>
       <Paper elevation={2} sx={{ p: 3 }}>
+        {notificationSuccess && (
+          <Alert severity="success" sx={{ mb: 2 }} onClose={() => setNotificationSuccess(null)}>
+            {notificationSuccess}
+          </Alert>
+        )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h5">Статистика по пользователям</Typography>
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <Button
+              variant="outlined"
+              startIcon={<BarChartIcon />}
+              onClick={() => setChartsOpen(true)}
+              disabled={isLoading}
+            >
+              Посмотреть график
+            </Button>
+            {isAdmin && (
+              <>
+                <Button
+                  variant="outlined"
+                  startIcon={<NotificationsIcon />}
+                  onClick={handleSendNotifications}
+                  disabled={isLoading || sendingNotifications}
+                  color="primary"
+                >
+                  {sendingNotifications ? 'Отправка...' : 'Разослать уведомления'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<FileDownloadIcon />}
+                  onClick={handleDownloadReport}
+                  disabled={isLoading}
+                  color="secondary"
+                >
+                  Отчет руководству
+                </Button>
+              </>
+            )}
             <IconButton onClick={goToPreviousMonth} disabled={isLoading}>
               <ChevronLeftIcon />
             </IconButton>
@@ -194,6 +297,7 @@ export const Statistics = () => {
               <TableHead>
                 <TableRow>
                   <TableCell>Email</TableCell>
+                  <TableCell align="right">Ожидается</TableCell>
                   <TableCell align="right">Часов за месяц</TableCell>
                 </TableRow>
               </TableHead>
@@ -220,10 +324,23 @@ export const Statistics = () => {
                             {stat.email}
                           </Box>
                         </TableCell>
-                        <TableCell align="right">{stat.totalHours.toFixed(2)}</TableCell>
+                        <TableCell align="right">
+                          {expectedHours > 0 ? expectedHours.toFixed(2) : '-'}
+                        </TableCell>
+                        <TableCell 
+                          align="right"
+                          sx={{
+                            color: expectedHours > 0 
+                              ? (stat.totalHours >= expectedHours ? 'success.main' : 'error.main')
+                              : 'inherit',
+                            fontWeight: expectedHours > 0 ? 'bold' : 'normal',
+                          }}
+                        >
+                          {stat.totalHours.toFixed(2)}
+                        </TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={2}>
+                        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={3}>
                           <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                             <Box sx={{ margin: 2 }}>
                               {isLoadingDetails ? (
@@ -266,6 +383,9 @@ export const Statistics = () => {
                     <strong>Итого</strong>
                   </TableCell>
                   <TableCell align="right">
+                    <strong>{expectedHours > 0 ? expectedHours.toFixed(2) : '-'}</strong>
+                  </TableCell>
+                  <TableCell align="right">
                     <strong>{totalHours.toFixed(2)}</strong>
                   </TableCell>
                 </TableRow>
@@ -274,6 +394,21 @@ export const Statistics = () => {
           </TableContainer>
         )}
       </Paper>
+
+      {/* Диалог с графиками */}
+      <Dialog
+        open={chartsOpen}
+        onClose={() => setChartsOpen(false)}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: { height: '90vh', maxHeight: '90vh' },
+        }}
+      >
+        <DialogContent sx={{ overflow: 'auto', maxHeight: 'calc(90vh - 64px)' }}>
+          <Charts year={year} month={month} onClose={() => setChartsOpen(false)} />
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 };

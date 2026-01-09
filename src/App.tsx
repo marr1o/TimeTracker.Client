@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import { useAuthStore } from './stores/authStore';
 import { Login } from './components/Login';
-import { Register } from './components/Register';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { Home } from './pages/Home';
@@ -39,12 +38,6 @@ function App() {
               path="/login"
               element={
                 isAuthenticated ? <Navigate to="/" replace /> : <Login />
-              }
-            />
-            <Route
-              path="/register"
-              element={
-                isAuthenticated ? <Navigate to="/" replace /> : <Register />
               }
             />
             <Route

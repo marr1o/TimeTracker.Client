@@ -13,6 +13,7 @@ const api = axios.create({
 
 // Флаг для отслеживания процесса обновления токена
 let isRefreshing = false;
+let isLoggingOut = false; // Флаг для предотвращения refresh при logout
 let failedQueue: Array<{
   resolve: (value?: any) => void;
   reject: (error?: any) => void;
@@ -50,17 +51,20 @@ api.interceptors.response.use(
       _retry?: boolean;
     }) | undefined;
 
-    // Если получили 401 и это не запрос на refresh/login/register и еще не пытались обновить токен
+    // Если получили 401 и это не запрос на refresh/login/register/logout и еще не пытались обновить токен
     // Не делаем refresh для login/register, так как там 401 означает неправильные данные
+    // Не делаем refresh для logout, так как токены уже удаляются
     const isAuthEndpoint = originalRequest?.url?.includes('/auth/login') || 
-                          originalRequest?.url?.includes('/auth/register');
+                          originalRequest?.url?.includes('/auth/register') ||
+                          originalRequest?.url?.includes('/auth/logout');
     
     if (
       error.response?.status === 401 &&
       originalRequest &&
       !originalRequest._retry &&
       !originalRequest.url?.includes('/auth/refresh') &&
-      !isAuthEndpoint
+      !isAuthEndpoint &&
+      !isLoggingOut
     ) {
       if (isRefreshing) {
         // Если уже идет процесс обновления, добавляем запрос в очередь
@@ -90,8 +94,8 @@ api.interceptors.response.use(
         processQueue(refreshError as AxiosError, null);
         isRefreshing = false;
 
-        // Если refresh не удался, перенаправляем на страницу логина
-        if (window.location.pathname !== '/login') {
+        // Если refresh не удался, перенаправляем на страницу логина (только если не происходит logout)
+        if (!isLoggingOut && window.location.pathname !== '/login') {
           window.location.href = '/login';
         }
 
@@ -102,6 +106,17 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Экспортируем функцию для установки флага logout
+export const setLoggingOut = (value: boolean) => {
+  isLoggingOut = value;
+  if (value) {
+    // Сбрасываем флаг обновления токена при logout
+    isRefreshing = false;
+    // Отклоняем все запросы в очереди
+    processQueue(new Error('Logging out'), null);
+  }
+};
 
 export default api;
 

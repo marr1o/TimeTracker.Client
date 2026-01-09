@@ -3,6 +3,7 @@ import { AppBar, Toolbar, Typography, Button, Box, IconButton } from '@mui/mater
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
+import { Notifications } from './Notifications';
 
 interface LayoutProps {
   children: ReactNode;
@@ -35,6 +36,7 @@ export const Layout = ({ children }: LayoutProps) => {
                 {user.email || `User #${user.id}`} ({user.role})
               </Typography>
             )}
+            <Notifications />
             <IconButton
               color="inherit"
               onClick={() => navigate('/profile')}

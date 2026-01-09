@@ -1,5 +1,6 @@
 import api from './api';
 import type { User, UpdateUserDTO } from '../types/user';
+import type { AuthResponseDTO } from '../types/auth';
 
 export const userService = {
   async getUsers(): Promise<User[]> {
@@ -9,6 +10,11 @@ export const userService = {
 
   async getUserById(userId: number): Promise<User> {
     const response = await api.get<User>(`/users/${userId}`);
+    return response.data;
+  },
+
+  async createUser(data: { email: string; password: string }): Promise<AuthResponseDTO> {
+    const response = await api.post<AuthResponseDTO>('/auth/register', data);
     return response.data;
   },
 

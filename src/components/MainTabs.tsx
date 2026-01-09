@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Box, Tabs, Tab, Paper } from '@mui/material';
 import { Calendar } from './Calendar';
 import { Statistics } from './Statistics';
+import { Register } from './Register';
+import { Schedule } from './Schedule';
 import { UserManagement } from './UserManagement';
 import { useAuthStore } from '../stores/authStore';
 
@@ -56,6 +58,8 @@ export const MainTabs = () => {
         >
           <Tab label="Календарь" />
           {isAdmin && <Tab label="Статистика" />}
+          {isAdmin && <Tab label="Заполнить график" />}
+          {isAdmin && <Tab label="Регистрация" />}
           {isAdmin && <Tab label="Пользователи" />}
         </Tabs>
       </Paper>
@@ -70,6 +74,16 @@ export const MainTabs = () => {
         )}
         {isAdmin && (
           <TabPanel value={value} index={2}>
+            <Schedule />
+          </TabPanel>
+        )}
+        {isAdmin && (
+          <TabPanel value={value} index={3}>
+            <Register />
+          </TabPanel>
+        )}
+        {isAdmin && (
+          <TabPanel value={value} index={4}>
             <UserManagement />
           </TabPanel>
         )}

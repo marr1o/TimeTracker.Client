@@ -64,11 +64,19 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   logout: async () => {
-    set({ isLoading: true });
+    // Сразу очищаем состояние, чтобы предотвратить любые промежуточные запросы
+    set({
+      user: null,
+      isAuthenticated: false,
+      isLoading: true,
+      error: null,
+    });
+    
     try {
       await authService.logout();
     } catch (error) {
-      console.error('Ошибка при выходе:', error);
+      // Игнорируем ошибки при logout - они ожидаемы, если токены уже удалены
+      console.warn('Logout completed with warnings (this is usually OK):', error);
     } finally {
       set({
         user: null,
@@ -80,14 +88,27 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   checkAuth: async () => {
+    // Проверяем, есть ли credentials cookie перед запросом
+    const credentialsCookie = document.cookie
+      .split('; ')
+      .find((row) => row.startsWith('credentials='));
+    
+    // Если нет credentials cookie, не делаем запрос
+    if (!credentialsCookie) {
+      set({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null,
+      });
+      return;
+    }
+
     set({ isLoading: true });
     try {
       const userData = await authService.getCurrentUser();
-      // Получаем полные данные пользователя из credentials cookie или используем полученные данные
-      const credentialsCookie = document.cookie
-        .split('; ')
-        .find((row) => row.startsWith('credentials='));
       
+      // Получаем полные данные пользователя из credentials cookie или используем полученные данные
       if (credentialsCookie) {
         try {
           const credentials = JSON.parse(
@@ -128,7 +149,12 @@ export const useAuthStore = create<AuthStore>((set) => ({
           error: null,
         });
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Игнорируем ошибки, связанные с logout
+      if (error?.message?.includes('Logging out')) {
+        return;
+      }
+      
       set({
         user: null,
         isAuthenticated: false,
